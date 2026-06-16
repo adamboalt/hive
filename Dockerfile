@@ -63,13 +63,12 @@ RUN test -f server/dist/index.js || (echo "ERROR: server build output missing" &
 FROM ghcr.io/simstudioai/simstudio:latest AS sim_app
 FROM ghcr.io/simstudioai/realtime:latest AS sim_realtime
 FROM ghcr.io/simstudioai/migrations:latest AS sim_migrations
-# NOTE: the memory sidecar (ghcr.io/agent-hive0/hive-colony-sidecar) is a
-# PRIVATE package in a different org; this fork's CI GITHUB_TOKEN can't pull
-# it (403). To bundle memory, make that package public OR add a cross-org
-# read:packages PAT as a repo secret + a second registry login, then restore
-# the `FROM ... AS hive_sidecar` line and the COPY below. hive-engines.sh
-# already self-skips the sidecar when its cli.js is absent, so memory stays
-# dark (not broken) until then.
+# Hive memory sidecar. The package was made PUBLIC (2026-06-16), so the fork's
+# CI GITHUB_TOKEN can now pull it. Pinned to v0.1.3 — the first build carrying
+# the company-profile / company-file / company-sheet / memory routes (the
+# Org > Info/Files/Sheets/Memory surfaces 404 without it). Bump this tag when
+# republishing the sidecar; never use :latest (pin upstream).
+FROM ghcr.io/agent-hive0/hive-colony-sidecar:v0.1.3 AS hive_sidecar
 
 FROM base AS production
 ARG USER_UID=1000
@@ -107,9 +106,11 @@ COPY --from=sim_app --chown=node:node /app /opt/hive-sim/app
 COPY --from=sim_realtime --chown=node:node /app /opt/hive-sim/realtime
 COPY --from=sim_migrations --chown=node:node /app /opt/hive-sim/migrations
 
-# Hive memory sidecar — see the note above the sim_* FROM stages. Restore
-# the COPY here once the sidecar package is pullable by this fork's CI:
-#   COPY --from=hive_sidecar --chown=node:node /sidecar /opt/hive-colony-sidecar
+# Hive memory sidecar — bundled from the public hive-colony-sidecar:v0.1.3
+# image (see the hive_sidecar FROM stage above). hive-engines.sh forks it as a
+# child process at boot when its cli.js is present; this COPY is what makes the
+# Org > Info/Files/Sheets/Memory surfaces (and agent memory) work end-to-end.
+COPY --from=hive_sidecar --chown=node:node /sidecar /opt/hive-colony-sidecar
 
 COPY scripts/docker-entrypoint.sh scripts/hive-engines.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/hive-engines.sh
