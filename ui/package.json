@@ -14,7 +14,7 @@
   },
   "type": "module",
   "scripts": {
-    "dev": "node api.js && vite",
+    "dev": "vite",
     "build": "tsc -b && vite build",
     "storybook": "storybook dev -p 6006 -c storybook/.storybook",
     "build-storybook": "storybook build -c storybook/.storybook -o storybook-static",
